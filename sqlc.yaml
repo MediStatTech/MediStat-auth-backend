@@ -1,0 +1,28 @@
+version: "2"
+sql:
+  - name: "personal"
+    engine: "postgresql"
+    queries: "pkg/db/query/personal.sql"
+    schema: ".tmp/schemas/personal.sql"
+    gen:
+      go:
+        package: "personal"
+        out: "internal/repository/personal"
+        emit_json_tags: true
+        emit_prepared_queries: true
+        emit_interface: false
+        emit_exact_table_names: false
+        emit_empty_slices: true
+  - name: "staff_roles"
+    engine: "postgresql"
+    queries: "pkg/db/query/staff_roles.sql"
+    schema: ".tmp/schemas/staff_roles.sql"
+    gen:
+      go:
+        package: "staff_roles"
+        out: "internal/repository/staff_roles"
+        emit_json_tags: true
+        emit_prepared_queries: true
+        emit_interface: false
+        emit_exact_table_names: false
+        emit_empty_slices: true
