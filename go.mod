@@ -3,7 +3,9 @@ module github.com/MediStatTech/MediStat-auth-backend
 go 1.24.4
 
 require (
+	github.com/MediStatTech/MediStat-jwt v1.0.2
 	github.com/MediStatTech/MediStat-log v0.0.0-20250823092924-3c863eeac9b9
+	github.com/google/uuid v1.6.0
 	github.com/labstack/echo-jwt/v4 v4.3.1
 	github.com/labstack/echo/v4 v4.13.4
 	github.com/spf13/viper v1.20.1
@@ -13,6 +15,7 @@ require (
 require (
 	github.com/fsnotify/fsnotify v1.8.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.2.1 // indirect
+	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/golang-jwt/jwt/v5 v5.2.2 // indirect
 	github.com/labstack/gommon v0.4.2 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
