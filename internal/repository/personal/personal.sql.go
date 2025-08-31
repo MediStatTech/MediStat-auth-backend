@@ -9,550 +9,248 @@ import (
 	"context"
 	"database/sql"
 	"time"
+
+	"github.com/google/uuid"
 )
-
-const countActivePersonal = `-- name: CountActivePersonal :one
-SELECT COUNT(*) as total
-FROM personal
-WHERE dismissed_at IS NULL OR dismissed_at > CURRENT_DATE
-`
-
-func (q *Queries) CountActivePersonal(ctx context.Context) (int64, error) {
-	row := q.queryRow(ctx, q.countActivePersonalStmt, countActivePersonal)
-	var total int64
-	err := row.Scan(&total)
-	return total, err
-}
-
-const countPersonalByRole = `-- name: CountPersonalByRole :one
-SELECT COUNT(*) as total
-FROM personal p
-JOIN staff_roles sr ON p.role_id = sr.role_id
-WHERE 
-    sr.code = $1
-    AND (p.dismissed_at IS NULL OR p.dismissed_at > CURRENT_DATE)
-`
-
-func (q *Queries) CountPersonalByRole(ctx context.Context, code string) (int64, error) {
-	row := q.queryRow(ctx, q.countPersonalByRoleStmt, countPersonalByRole, code)
-	var total int64
-	err := row.Scan(&total)
-	return total, err
-}
 
 const createPersonal = `-- name: CreatePersonal :one
 INSERT INTO personal (
-    full_name, 
-    role_id, 
-    department, 
-    phone, 
-    email, 
-    hired_at
+    personal_id,
+    first_name,
+    last_name,
+    email,
+    phone,
+    password_hash,
+    status,
+    departure,
+    created_at,
+    updated_at
 ) VALUES (
-    $1, $2, $3, $4, $5, $6
-)
-RETURNING staff_id, full_name, role_id, department, phone, email, hired_at, dismissed_at, created_at, updated_at
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+) RETURNING personal_id, first_name, last_name, email, password_hash, phone, status, departure, created_at, updated_at
 `
 
 type CreatePersonalParams struct {
-	FullName   string         `json:"full_name"`
-	RoleID     int32          `json:"role_id"`
-	Department sql.NullString `json:"department"`
-	Phone      sql.NullString `json:"phone"`
-	Email      sql.NullString `json:"email"`
-	HiredAt    sql.NullTime   `json:"hired_at"`
+	PersonalID   uuid.UUID      `json:"personal_id"`
+	FirstName    string         `json:"first_name"`
+	LastName     string         `json:"last_name"`
+	Email        string         `json:"email"`
+	Phone        sql.NullString `json:"phone"`
+	PasswordHash string         `json:"password_hash"`
+	Status       string         `json:"status"`
+	Departure    string         `json:"departure"`
+	CreatedAt    time.Time      `json:"created_at"`
+	UpdatedAt    sql.NullTime   `json:"updated_at"`
 }
 
 func (q *Queries) CreatePersonal(ctx context.Context, arg CreatePersonalParams) (Personal, error) {
 	row := q.queryRow(ctx, q.createPersonalStmt, createPersonal,
-		arg.FullName,
-		arg.RoleID,
-		arg.Department,
-		arg.Phone,
+		arg.PersonalID,
+		arg.FirstName,
+		arg.LastName,
 		arg.Email,
-		arg.HiredAt,
+		arg.Phone,
+		arg.PasswordHash,
+		arg.Status,
+		arg.Departure,
+		arg.CreatedAt,
+		arg.UpdatedAt,
 	)
 	var i Personal
 	err := row.Scan(
-		&i.StaffID,
-		&i.FullName,
-		&i.RoleID,
-		&i.Department,
-		&i.Phone,
+		&i.PersonalID,
+		&i.FirstName,
+		&i.LastName,
 		&i.Email,
-		&i.HiredAt,
-		&i.DismissedAt,
+		&i.PasswordHash,
+		&i.Phone,
+		&i.Status,
+		&i.Departure,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return i, err
 }
 
-const deletePersonal = `-- name: DeletePersonal :exec
-DELETE FROM personal
-WHERE staff_id = $1
+const existsPersonalByEmail = `-- name: ExistsPersonalByEmail :one
+SELECT EXISTS(
+    SELECT 1
+    FROM personal
+    WHERE email = $1
+) AS exists
 `
 
-func (q *Queries) DeletePersonal(ctx context.Context, staffID int64) error {
-	_, err := q.exec(ctx, q.deletePersonalStmt, deletePersonal, staffID)
-	return err
+func (q *Queries) ExistsPersonalByEmail(ctx context.Context, email string) (bool, error) {
+	row := q.queryRow(ctx, q.existsPersonalByEmailStmt, existsPersonalByEmail, email)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
 }
 
-const dismissPersonal = `-- name: DismissPersonal :one
-UPDATE personal
-SET 
-    dismissed_at = CURRENT_DATE,
-    updated_at = NOW()
-WHERE staff_id = $1
-RETURNING staff_id, full_name, role_id, department, phone, email, hired_at, dismissed_at, created_at, updated_at
+const getAllPersonal = `-- name: GetAllPersonal :many
+SELECT personal_id, first_name, last_name, email, password_hash, phone, status, departure, created_at, updated_at FROM personal
+ORDER BY created_at DESC
 `
 
-func (q *Queries) DismissPersonal(ctx context.Context, staffID int64) (Personal, error) {
-	row := q.queryRow(ctx, q.dismissPersonalStmt, dismissPersonal, staffID)
-	var i Personal
-	err := row.Scan(
-		&i.StaffID,
-		&i.FullName,
-		&i.RoleID,
-		&i.Department,
-		&i.Phone,
-		&i.Email,
-		&i.HiredAt,
-		&i.DismissedAt,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
+func (q *Queries) GetAllPersonal(ctx context.Context) ([]Personal, error) {
+	rows, err := q.query(ctx, q.getAllPersonalStmt, getAllPersonal)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Personal{}
+	for rows.Next() {
+		var i Personal
+		if err := rows.Scan(
+			&i.PersonalID,
+			&i.FirstName,
+			&i.LastName,
+			&i.Email,
+			&i.PasswordHash,
+			&i.Phone,
+			&i.Status,
+			&i.Departure,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getPersonalByEmail = `-- name: GetPersonalByEmail :one
-SELECT 
-    p.staff_id, p.full_name, p.role_id, p.department, p.phone, p.email, p.hired_at, p.dismissed_at, p.created_at, p.updated_at,
-    sr.code as role_code,
-    sr.name as role_name
-FROM personal p
-JOIN staff_roles sr ON p.role_id = sr.role_id
-WHERE p.email = $1
+SELECT personal_id, first_name, last_name, email, password_hash, phone, status, departure, created_at, updated_at FROM personal
+WHERE email = $1
 `
 
-type GetPersonalByEmailRow struct {
-	StaffID     int64          `json:"staff_id"`
-	FullName    string         `json:"full_name"`
-	RoleID      int32          `json:"role_id"`
-	Department  sql.NullString `json:"department"`
-	Phone       sql.NullString `json:"phone"`
-	Email       sql.NullString `json:"email"`
-	HiredAt     sql.NullTime   `json:"hired_at"`
-	DismissedAt sql.NullTime   `json:"dismissed_at"`
-	CreatedAt   time.Time      `json:"created_at"`
-	UpdatedAt   time.Time      `json:"updated_at"`
-	RoleCode    string         `json:"role_code"`
-	RoleName    string         `json:"role_name"`
-}
-
-func (q *Queries) GetPersonalByEmail(ctx context.Context, email sql.NullString) (GetPersonalByEmailRow, error) {
+func (q *Queries) GetPersonalByEmail(ctx context.Context, email string) (Personal, error) {
 	row := q.queryRow(ctx, q.getPersonalByEmailStmt, getPersonalByEmail, email)
-	var i GetPersonalByEmailRow
+	var i Personal
 	err := row.Scan(
-		&i.StaffID,
-		&i.FullName,
-		&i.RoleID,
-		&i.Department,
-		&i.Phone,
+		&i.PersonalID,
+		&i.FirstName,
+		&i.LastName,
 		&i.Email,
-		&i.HiredAt,
-		&i.DismissedAt,
+		&i.PasswordHash,
+		&i.Phone,
+		&i.Status,
+		&i.Departure,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.RoleCode,
-		&i.RoleName,
 	)
 	return i, err
 }
 
 const getPersonalByID = `-- name: GetPersonalByID :one
-SELECT 
-    p.staff_id, p.full_name, p.role_id, p.department, p.phone, p.email, p.hired_at, p.dismissed_at, p.created_at, p.updated_at,
-    sr.code as role_code,
-    sr.name as role_name
-FROM personal p
-JOIN staff_roles sr ON p.role_id = sr.role_id
-WHERE p.staff_id = $1
+SELECT personal_id, first_name, last_name, email, password_hash, phone, status, departure, created_at, updated_at FROM personal
+WHERE personal_id = $1
 `
 
-type GetPersonalByIDRow struct {
-	StaffID     int64          `json:"staff_id"`
-	FullName    string         `json:"full_name"`
-	RoleID      int32          `json:"role_id"`
-	Department  sql.NullString `json:"department"`
-	Phone       sql.NullString `json:"phone"`
-	Email       sql.NullString `json:"email"`
-	HiredAt     sql.NullTime   `json:"hired_at"`
-	DismissedAt sql.NullTime   `json:"dismissed_at"`
-	CreatedAt   time.Time      `json:"created_at"`
-	UpdatedAt   time.Time      `json:"updated_at"`
-	RoleCode    string         `json:"role_code"`
-	RoleName    string         `json:"role_name"`
-}
-
-func (q *Queries) GetPersonalByID(ctx context.Context, staffID int64) (GetPersonalByIDRow, error) {
-	row := q.queryRow(ctx, q.getPersonalByIDStmt, getPersonalByID, staffID)
-	var i GetPersonalByIDRow
-	err := row.Scan(
-		&i.StaffID,
-		&i.FullName,
-		&i.RoleID,
-		&i.Department,
-		&i.Phone,
-		&i.Email,
-		&i.HiredAt,
-		&i.DismissedAt,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.RoleCode,
-		&i.RoleName,
-	)
-	return i, err
-}
-
-const listPersonal = `-- name: ListPersonal :many
-SELECT 
-    p.staff_id, p.full_name, p.role_id, p.department, p.phone, p.email, p.hired_at, p.dismissed_at, p.created_at, p.updated_at,
-    sr.code as role_code,
-    sr.name as role_name
-FROM personal p
-JOIN staff_roles sr ON p.role_id = sr.role_id
-WHERE 
-    (p.dismissed_at IS NULL OR p.dismissed_at > CURRENT_DATE)
-ORDER BY p.staff_id
-LIMIT $1 OFFSET $2
-`
-
-type ListPersonalParams struct {
-	Limit  int32 `json:"limit"`
-	Offset int32 `json:"offset"`
-}
-
-type ListPersonalRow struct {
-	StaffID     int64          `json:"staff_id"`
-	FullName    string         `json:"full_name"`
-	RoleID      int32          `json:"role_id"`
-	Department  sql.NullString `json:"department"`
-	Phone       sql.NullString `json:"phone"`
-	Email       sql.NullString `json:"email"`
-	HiredAt     sql.NullTime   `json:"hired_at"`
-	DismissedAt sql.NullTime   `json:"dismissed_at"`
-	CreatedAt   time.Time      `json:"created_at"`
-	UpdatedAt   time.Time      `json:"updated_at"`
-	RoleCode    string         `json:"role_code"`
-	RoleName    string         `json:"role_name"`
-}
-
-func (q *Queries) ListPersonal(ctx context.Context, arg ListPersonalParams) ([]ListPersonalRow, error) {
-	rows, err := q.query(ctx, q.listPersonalStmt, listPersonal, arg.Limit, arg.Offset)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListPersonalRow{}
-	for rows.Next() {
-		var i ListPersonalRow
-		if err := rows.Scan(
-			&i.StaffID,
-			&i.FullName,
-			&i.RoleID,
-			&i.Department,
-			&i.Phone,
-			&i.Email,
-			&i.HiredAt,
-			&i.DismissedAt,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.RoleCode,
-			&i.RoleName,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listPersonalByDepartment = `-- name: ListPersonalByDepartment :many
-SELECT 
-    p.staff_id, p.full_name, p.role_id, p.department, p.phone, p.email, p.hired_at, p.dismissed_at, p.created_at, p.updated_at,
-    sr.code as role_code,
-    sr.name as role_name
-FROM personal p
-JOIN staff_roles sr ON p.role_id = sr.role_id
-WHERE 
-    p.department = $1
-    AND (p.dismissed_at IS NULL OR p.dismissed_at > CURRENT_DATE)
-ORDER BY p.staff_id
-`
-
-type ListPersonalByDepartmentRow struct {
-	StaffID     int64          `json:"staff_id"`
-	FullName    string         `json:"full_name"`
-	RoleID      int32          `json:"role_id"`
-	Department  sql.NullString `json:"department"`
-	Phone       sql.NullString `json:"phone"`
-	Email       sql.NullString `json:"email"`
-	HiredAt     sql.NullTime   `json:"hired_at"`
-	DismissedAt sql.NullTime   `json:"dismissed_at"`
-	CreatedAt   time.Time      `json:"created_at"`
-	UpdatedAt   time.Time      `json:"updated_at"`
-	RoleCode    string         `json:"role_code"`
-	RoleName    string         `json:"role_name"`
-}
-
-func (q *Queries) ListPersonalByDepartment(ctx context.Context, department sql.NullString) ([]ListPersonalByDepartmentRow, error) {
-	rows, err := q.query(ctx, q.listPersonalByDepartmentStmt, listPersonalByDepartment, department)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListPersonalByDepartmentRow{}
-	for rows.Next() {
-		var i ListPersonalByDepartmentRow
-		if err := rows.Scan(
-			&i.StaffID,
-			&i.FullName,
-			&i.RoleID,
-			&i.Department,
-			&i.Phone,
-			&i.Email,
-			&i.HiredAt,
-			&i.DismissedAt,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.RoleCode,
-			&i.RoleName,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listPersonalByRole = `-- name: ListPersonalByRole :many
-SELECT 
-    p.staff_id, p.full_name, p.role_id, p.department, p.phone, p.email, p.hired_at, p.dismissed_at, p.created_at, p.updated_at,
-    sr.code as role_code,
-    sr.name as role_name
-FROM personal p
-JOIN staff_roles sr ON p.role_id = sr.role_id
-WHERE 
-    sr.code = $1
-    AND (p.dismissed_at IS NULL OR p.dismissed_at > CURRENT_DATE)
-ORDER BY p.staff_id
-`
-
-type ListPersonalByRoleRow struct {
-	StaffID     int64          `json:"staff_id"`
-	FullName    string         `json:"full_name"`
-	RoleID      int32          `json:"role_id"`
-	Department  sql.NullString `json:"department"`
-	Phone       sql.NullString `json:"phone"`
-	Email       sql.NullString `json:"email"`
-	HiredAt     sql.NullTime   `json:"hired_at"`
-	DismissedAt sql.NullTime   `json:"dismissed_at"`
-	CreatedAt   time.Time      `json:"created_at"`
-	UpdatedAt   time.Time      `json:"updated_at"`
-	RoleCode    string         `json:"role_code"`
-	RoleName    string         `json:"role_name"`
-}
-
-func (q *Queries) ListPersonalByRole(ctx context.Context, code string) ([]ListPersonalByRoleRow, error) {
-	rows, err := q.query(ctx, q.listPersonalByRoleStmt, listPersonalByRole, code)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListPersonalByRoleRow{}
-	for rows.Next() {
-		var i ListPersonalByRoleRow
-		if err := rows.Scan(
-			&i.StaffID,
-			&i.FullName,
-			&i.RoleID,
-			&i.Department,
-			&i.Phone,
-			&i.Email,
-			&i.HiredAt,
-			&i.DismissedAt,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.RoleCode,
-			&i.RoleName,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const restorePersonal = `-- name: RestorePersonal :one
-UPDATE personal
-SET 
-    dismissed_at = NULL,
-    updated_at = NOW()
-WHERE staff_id = $1
-RETURNING staff_id, full_name, role_id, department, phone, email, hired_at, dismissed_at, created_at, updated_at
-`
-
-func (q *Queries) RestorePersonal(ctx context.Context, staffID int64) (Personal, error) {
-	row := q.queryRow(ctx, q.restorePersonalStmt, restorePersonal, staffID)
+func (q *Queries) GetPersonalByID(ctx context.Context, personalID uuid.UUID) (Personal, error) {
+	row := q.queryRow(ctx, q.getPersonalByIDStmt, getPersonalByID, personalID)
 	var i Personal
 	err := row.Scan(
-		&i.StaffID,
-		&i.FullName,
-		&i.RoleID,
-		&i.Department,
-		&i.Phone,
+		&i.PersonalID,
+		&i.FirstName,
+		&i.LastName,
 		&i.Email,
-		&i.HiredAt,
-		&i.DismissedAt,
+		&i.PasswordHash,
+		&i.Phone,
+		&i.Status,
+		&i.Departure,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return i, err
-}
-
-const searchPersonal = `-- name: SearchPersonal :many
-SELECT 
-    p.staff_id, p.full_name, p.role_id, p.department, p.phone, p.email, p.hired_at, p.dismissed_at, p.created_at, p.updated_at,
-    sr.code as role_code,
-    sr.name as role_name
-FROM personal p
-JOIN staff_roles sr ON p.role_id = sr.role_id
-WHERE 
-    (p.full_name ILIKE '%' || $1 || '%' 
-     OR p.email ILIKE '%' || $1 || '%'
-     OR p.phone ILIKE '%' || $1 || '%')
-    AND (p.dismissed_at IS NULL OR p.dismissed_at > CURRENT_DATE)
-ORDER BY p.staff_id
-LIMIT $2 OFFSET $3
-`
-
-type SearchPersonalParams struct {
-	Column1 sql.NullString `json:"column_1"`
-	Limit   int32          `json:"limit"`
-	Offset  int32          `json:"offset"`
-}
-
-type SearchPersonalRow struct {
-	StaffID     int64          `json:"staff_id"`
-	FullName    string         `json:"full_name"`
-	RoleID      int32          `json:"role_id"`
-	Department  sql.NullString `json:"department"`
-	Phone       sql.NullString `json:"phone"`
-	Email       sql.NullString `json:"email"`
-	HiredAt     sql.NullTime   `json:"hired_at"`
-	DismissedAt sql.NullTime   `json:"dismissed_at"`
-	CreatedAt   time.Time      `json:"created_at"`
-	UpdatedAt   time.Time      `json:"updated_at"`
-	RoleCode    string         `json:"role_code"`
-	RoleName    string         `json:"role_name"`
-}
-
-func (q *Queries) SearchPersonal(ctx context.Context, arg SearchPersonalParams) ([]SearchPersonalRow, error) {
-	rows, err := q.query(ctx, q.searchPersonalStmt, searchPersonal, arg.Column1, arg.Limit, arg.Offset)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []SearchPersonalRow{}
-	for rows.Next() {
-		var i SearchPersonalRow
-		if err := rows.Scan(
-			&i.StaffID,
-			&i.FullName,
-			&i.RoleID,
-			&i.Department,
-			&i.Phone,
-			&i.Email,
-			&i.HiredAt,
-			&i.DismissedAt,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.RoleCode,
-			&i.RoleName,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const updatePersonal = `-- name: UpdatePersonal :one
 UPDATE personal
-SET 
-    full_name = COALESCE($2, full_name),
-    role_id = COALESCE($3, role_id),
-    department = COALESCE($4, department),
-    phone = COALESCE($5, phone),
-    email = COALESCE($6, email),
-    updated_at = NOW()
-WHERE staff_id = $1
-RETURNING staff_id, full_name, role_id, department, phone, email, hired_at, dismissed_at, created_at, updated_at
+SET
+    first_name = $2,
+    last_name = $3,
+    email = $4,
+    phone = $5,
+    status = $6,
+    departure = $7,
+    updated_at = $8
+WHERE personal_id = $1
+RETURNING personal_id, first_name, last_name, email, password_hash, phone, status, departure, created_at, updated_at
 `
 
 type UpdatePersonalParams struct {
-	StaffID    int64          `json:"staff_id"`
-	FullName   string         `json:"full_name"`
-	RoleID     int32          `json:"role_id"`
-	Department sql.NullString `json:"department"`
+	PersonalID uuid.UUID      `json:"personal_id"`
+	FirstName  string         `json:"first_name"`
+	LastName   string         `json:"last_name"`
+	Email      string         `json:"email"`
 	Phone      sql.NullString `json:"phone"`
-	Email      sql.NullString `json:"email"`
+	Status     string         `json:"status"`
+	Departure  string         `json:"departure"`
+	UpdatedAt  sql.NullTime   `json:"updated_at"`
 }
 
 func (q *Queries) UpdatePersonal(ctx context.Context, arg UpdatePersonalParams) (Personal, error) {
 	row := q.queryRow(ctx, q.updatePersonalStmt, updatePersonal,
-		arg.StaffID,
-		arg.FullName,
-		arg.RoleID,
-		arg.Department,
-		arg.Phone,
+		arg.PersonalID,
+		arg.FirstName,
+		arg.LastName,
 		arg.Email,
+		arg.Phone,
+		arg.Status,
+		arg.Departure,
+		arg.UpdatedAt,
 	)
 	var i Personal
 	err := row.Scan(
-		&i.StaffID,
-		&i.FullName,
-		&i.RoleID,
-		&i.Department,
-		&i.Phone,
+		&i.PersonalID,
+		&i.FirstName,
+		&i.LastName,
 		&i.Email,
-		&i.HiredAt,
-		&i.DismissedAt,
+		&i.PasswordHash,
+		&i.Phone,
+		&i.Status,
+		&i.Departure,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updatePersonalStatus = `-- name: UpdatePersonalStatus :one
+UPDATE personal
+SET
+    status = $2,
+    updated_at = $3
+WHERE personal_id = $1
+RETURNING personal_id, first_name, last_name, email, password_hash, phone, status, departure, created_at, updated_at
+`
+
+type UpdatePersonalStatusParams struct {
+	PersonalID uuid.UUID    `json:"personal_id"`
+	Status     string       `json:"status"`
+	UpdatedAt  sql.NullTime `json:"updated_at"`
+}
+
+func (q *Queries) UpdatePersonalStatus(ctx context.Context, arg UpdatePersonalStatusParams) (Personal, error) {
+	row := q.queryRow(ctx, q.updatePersonalStatusStmt, updatePersonalStatus, arg.PersonalID, arg.Status, arg.UpdatedAt)
+	var i Personal
+	err := row.Scan(
+		&i.PersonalID,
+		&i.FirstName,
+		&i.LastName,
+		&i.Email,
+		&i.PasswordHash,
+		&i.Phone,
+		&i.Status,
+		&i.Departure,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

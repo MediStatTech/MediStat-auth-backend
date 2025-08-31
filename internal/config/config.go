@@ -5,6 +5,8 @@ import "github.com/spf13/viper"
 type Config struct {
 	JWTTokenSecret string `mapstructure:"JWT_TOKEN_SECRET" validate:"required"`
 	HTTPPort       string `mapstructure:"HTTP_PORT" validate:"required"`
+	PostgresDSN    string `mapstructure:"POSTGRES_DSN" validate:"required"`
+	JWTSecret      string `mapstructure:"JWT_SECRET" validate:"required"`
 }
 
 func NewConfig() (*Config, error) {

@@ -1,20 +1,14 @@
----Test
-CREATE TABLE staff_roles (
-    role_id SERIAL PRIMARY KEY,
-    code    VARCHAR(50) UNIQUE NOT NULL,   -- doctor, nurse, administrator
-    name    VARCHAR(100) NOT NULL          -- Человекочитаемое название
-);
-
-
 CREATE TABLE personal (
-    staff_id     BIGSERIAL PRIMARY KEY,
-    full_name    VARCHAR(255) NOT NULL,
-    role_id      INT NOT NULL REFERENCES staff_roles(role_id),
-    department   VARCHAR(100),
-    phone        VARCHAR(50),
-    email        VARCHAR(100) UNIQUE,
-    hired_at     DATE,
-    dismissed_at DATE,
-    created_at   TIMESTAMP NOT NULL DEFAULT now(),
-    updated_at   TIMESTAMP NOT NULL DEFAULT now()
+    personal_id UUID PRIMARY KEY,                 
+    first_name VARCHAR(100) NOT NULL,             
+    last_name VARCHAR(100) NOT NULL,             
+    email VARCHAR(255) NOT NULL UNIQUE,     
+    password_hash TEXT NOT NULL,     
+    phone VARCHAR(20),                          
+    status VARCHAR(50) NOT NULL,                  
+    departure VARCHAR(100) NOT NULL,                       
+    created_at TIMESTAMPTZ NOT NULL,              
+    updated_at TIMESTAMPTZ                        
 );
+
+CREATE INDEX idx_personal_email ON personal(email);

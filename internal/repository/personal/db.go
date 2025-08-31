@@ -24,20 +24,14 @@ func New(db DBTX) *Queries {
 func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	q := Queries{db: db}
 	var err error
-	if q.countActivePersonalStmt, err = db.PrepareContext(ctx, countActivePersonal); err != nil {
-		return nil, fmt.Errorf("error preparing query CountActivePersonal: %w", err)
-	}
-	if q.countPersonalByRoleStmt, err = db.PrepareContext(ctx, countPersonalByRole); err != nil {
-		return nil, fmt.Errorf("error preparing query CountPersonalByRole: %w", err)
-	}
 	if q.createPersonalStmt, err = db.PrepareContext(ctx, createPersonal); err != nil {
 		return nil, fmt.Errorf("error preparing query CreatePersonal: %w", err)
 	}
-	if q.deletePersonalStmt, err = db.PrepareContext(ctx, deletePersonal); err != nil {
-		return nil, fmt.Errorf("error preparing query DeletePersonal: %w", err)
+	if q.existsPersonalByEmailStmt, err = db.PrepareContext(ctx, existsPersonalByEmail); err != nil {
+		return nil, fmt.Errorf("error preparing query ExistsPersonalByEmail: %w", err)
 	}
-	if q.dismissPersonalStmt, err = db.PrepareContext(ctx, dismissPersonal); err != nil {
-		return nil, fmt.Errorf("error preparing query DismissPersonal: %w", err)
+	if q.getAllPersonalStmt, err = db.PrepareContext(ctx, getAllPersonal); err != nil {
+		return nil, fmt.Errorf("error preparing query GetAllPersonal: %w", err)
 	}
 	if q.getPersonalByEmailStmt, err = db.PrepareContext(ctx, getPersonalByEmail); err != nil {
 		return nil, fmt.Errorf("error preparing query GetPersonalByEmail: %w", err)
@@ -45,52 +39,30 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.getPersonalByIDStmt, err = db.PrepareContext(ctx, getPersonalByID); err != nil {
 		return nil, fmt.Errorf("error preparing query GetPersonalByID: %w", err)
 	}
-	if q.listPersonalStmt, err = db.PrepareContext(ctx, listPersonal); err != nil {
-		return nil, fmt.Errorf("error preparing query ListPersonal: %w", err)
-	}
-	if q.listPersonalByDepartmentStmt, err = db.PrepareContext(ctx, listPersonalByDepartment); err != nil {
-		return nil, fmt.Errorf("error preparing query ListPersonalByDepartment: %w", err)
-	}
-	if q.listPersonalByRoleStmt, err = db.PrepareContext(ctx, listPersonalByRole); err != nil {
-		return nil, fmt.Errorf("error preparing query ListPersonalByRole: %w", err)
-	}
-	if q.restorePersonalStmt, err = db.PrepareContext(ctx, restorePersonal); err != nil {
-		return nil, fmt.Errorf("error preparing query RestorePersonal: %w", err)
-	}
-	if q.searchPersonalStmt, err = db.PrepareContext(ctx, searchPersonal); err != nil {
-		return nil, fmt.Errorf("error preparing query SearchPersonal: %w", err)
-	}
 	if q.updatePersonalStmt, err = db.PrepareContext(ctx, updatePersonal); err != nil {
 		return nil, fmt.Errorf("error preparing query UpdatePersonal: %w", err)
+	}
+	if q.updatePersonalStatusStmt, err = db.PrepareContext(ctx, updatePersonalStatus); err != nil {
+		return nil, fmt.Errorf("error preparing query UpdatePersonalStatus: %w", err)
 	}
 	return &q, nil
 }
 
 func (q *Queries) Close() error {
 	var err error
-	if q.countActivePersonalStmt != nil {
-		if cerr := q.countActivePersonalStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing countActivePersonalStmt: %w", cerr)
-		}
-	}
-	if q.countPersonalByRoleStmt != nil {
-		if cerr := q.countPersonalByRoleStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing countPersonalByRoleStmt: %w", cerr)
-		}
-	}
 	if q.createPersonalStmt != nil {
 		if cerr := q.createPersonalStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing createPersonalStmt: %w", cerr)
 		}
 	}
-	if q.deletePersonalStmt != nil {
-		if cerr := q.deletePersonalStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing deletePersonalStmt: %w", cerr)
+	if q.existsPersonalByEmailStmt != nil {
+		if cerr := q.existsPersonalByEmailStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing existsPersonalByEmailStmt: %w", cerr)
 		}
 	}
-	if q.dismissPersonalStmt != nil {
-		if cerr := q.dismissPersonalStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing dismissPersonalStmt: %w", cerr)
+	if q.getAllPersonalStmt != nil {
+		if cerr := q.getAllPersonalStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getAllPersonalStmt: %w", cerr)
 		}
 	}
 	if q.getPersonalByEmailStmt != nil {
@@ -103,34 +75,14 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing getPersonalByIDStmt: %w", cerr)
 		}
 	}
-	if q.listPersonalStmt != nil {
-		if cerr := q.listPersonalStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing listPersonalStmt: %w", cerr)
-		}
-	}
-	if q.listPersonalByDepartmentStmt != nil {
-		if cerr := q.listPersonalByDepartmentStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing listPersonalByDepartmentStmt: %w", cerr)
-		}
-	}
-	if q.listPersonalByRoleStmt != nil {
-		if cerr := q.listPersonalByRoleStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing listPersonalByRoleStmt: %w", cerr)
-		}
-	}
-	if q.restorePersonalStmt != nil {
-		if cerr := q.restorePersonalStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing restorePersonalStmt: %w", cerr)
-		}
-	}
-	if q.searchPersonalStmt != nil {
-		if cerr := q.searchPersonalStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing searchPersonalStmt: %w", cerr)
-		}
-	}
 	if q.updatePersonalStmt != nil {
 		if cerr := q.updatePersonalStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing updatePersonalStmt: %w", cerr)
+		}
+	}
+	if q.updatePersonalStatusStmt != nil {
+		if cerr := q.updatePersonalStatusStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing updatePersonalStatusStmt: %w", cerr)
 		}
 	}
 	return err
@@ -170,39 +122,27 @@ func (q *Queries) queryRow(ctx context.Context, stmt *sql.Stmt, query string, ar
 }
 
 type Queries struct {
-	db                           DBTX
-	tx                           *sql.Tx
-	countActivePersonalStmt      *sql.Stmt
-	countPersonalByRoleStmt      *sql.Stmt
-	createPersonalStmt           *sql.Stmt
-	deletePersonalStmt           *sql.Stmt
-	dismissPersonalStmt          *sql.Stmt
-	getPersonalByEmailStmt       *sql.Stmt
-	getPersonalByIDStmt          *sql.Stmt
-	listPersonalStmt             *sql.Stmt
-	listPersonalByDepartmentStmt *sql.Stmt
-	listPersonalByRoleStmt       *sql.Stmt
-	restorePersonalStmt          *sql.Stmt
-	searchPersonalStmt           *sql.Stmt
-	updatePersonalStmt           *sql.Stmt
+	db                        DBTX
+	tx                        *sql.Tx
+	createPersonalStmt        *sql.Stmt
+	existsPersonalByEmailStmt *sql.Stmt
+	getAllPersonalStmt        *sql.Stmt
+	getPersonalByEmailStmt    *sql.Stmt
+	getPersonalByIDStmt       *sql.Stmt
+	updatePersonalStmt        *sql.Stmt
+	updatePersonalStatusStmt  *sql.Stmt
 }
 
 func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 	return &Queries{
-		db:                           tx,
-		tx:                           tx,
-		countActivePersonalStmt:      q.countActivePersonalStmt,
-		countPersonalByRoleStmt:      q.countPersonalByRoleStmt,
-		createPersonalStmt:           q.createPersonalStmt,
-		deletePersonalStmt:           q.deletePersonalStmt,
-		dismissPersonalStmt:          q.dismissPersonalStmt,
-		getPersonalByEmailStmt:       q.getPersonalByEmailStmt,
-		getPersonalByIDStmt:          q.getPersonalByIDStmt,
-		listPersonalStmt:             q.listPersonalStmt,
-		listPersonalByDepartmentStmt: q.listPersonalByDepartmentStmt,
-		listPersonalByRoleStmt:       q.listPersonalByRoleStmt,
-		restorePersonalStmt:          q.restorePersonalStmt,
-		searchPersonalStmt:           q.searchPersonalStmt,
-		updatePersonalStmt:           q.updatePersonalStmt,
+		db:                        tx,
+		tx:                        tx,
+		createPersonalStmt:        q.createPersonalStmt,
+		existsPersonalByEmailStmt: q.existsPersonalByEmailStmt,
+		getAllPersonalStmt:        q.getAllPersonalStmt,
+		getPersonalByEmailStmt:    q.getPersonalByEmailStmt,
+		getPersonalByIDStmt:       q.getPersonalByIDStmt,
+		updatePersonalStmt:        q.updatePersonalStmt,
+		updatePersonalStatusStmt:  q.updatePersonalStatusStmt,
 	}
 }
