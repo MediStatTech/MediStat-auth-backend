@@ -7,23 +7,19 @@ package personal
 import (
 	"database/sql"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type Personal struct {
-	StaffID     int64          `json:"staff_id"`
-	FullName    string         `json:"full_name"`
-	RoleID      int32          `json:"role_id"`
-	Department  sql.NullString `json:"department"`
-	Phone       sql.NullString `json:"phone"`
-	Email       sql.NullString `json:"email"`
-	HiredAt     sql.NullTime   `json:"hired_at"`
-	DismissedAt sql.NullTime   `json:"dismissed_at"`
-	CreatedAt   time.Time      `json:"created_at"`
-	UpdatedAt   time.Time      `json:"updated_at"`
-}
-
-type StaffRole struct {
-	RoleID int32  `json:"role_id"`
-	Code   string `json:"code"`
-	Name   string `json:"name"`
+	PersonalID   uuid.UUID      `json:"personal_id"`
+	FirstName    string         `json:"first_name"`
+	LastName     string         `json:"last_name"`
+	Email        string         `json:"email"`
+	PasswordHash string         `json:"password_hash"`
+	Phone        sql.NullString `json:"phone"`
+	Status       string         `json:"status"`
+	Departure    string         `json:"departure"`
+	CreatedAt    time.Time      `json:"created_at"`
+	UpdatedAt    sql.NullTime   `json:"updated_at"`
 }

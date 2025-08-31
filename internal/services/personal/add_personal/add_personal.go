@@ -1,39 +1,35 @@
-package sign_in
+package add_personal
 
 import (
 	"context"
 	"github.com/MediStatTech/MediStat-auth-backend/internal/domain/dto"
 	"github.com/MediStatTech/MediStat-auth-backend/internal/repository/personal"
-	"github.com/MediStatTech/MediStat-jwt"
 )
 
 type Facade struct {
 	perRepo *personal.Queries
-	jwt     *jwt.JWT
 } 
 
-func New(perRepo *personal.Queries, jwt *jwt.JWT) *Facade {
+func New(perRepo *personal.Queries) *Facade {
 	return &Facade{
 		perRepo: perRepo,
-		jwt:     jwt,
 	}
 }
 
-func (f *Facade) Handle(ctx context.Context, req *dto.SignInRequest) (*dto.SignInResponse, error) {
+func (f *Facade) Handle(ctx context.Context, req *dto.AddPersonalRequest) (*dto.AddPersonalResponse, error) {
 	serv := service{
 		ctx:     ctx,
 		req:     req,
 		perRepo: f.perRepo,
-		jwt:     f.jwt,
 	}
 
-	if err := serv.findByEmail(); err != nil {
+	if err := serv.checkExists(); err != nil {
 		return nil, err
 	}
-	if err := serv.checkPassword(); err != nil {
+	if err := serv.hashPassword(); err != nil {
 		return nil, err
 	}
-	if err := serv.generateToken(); err != nil {
+	if err := serv.create(); err != nil {
 		return nil, err
 	}
 	

@@ -5,11 +5,15 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/MediStatTech/MediStat-auth-backend/internal/config"
+	"github.com/MediStatTech/MediStat-auth-backend/internal/repository"
 	"github.com/MediStatTech/MediStat-auth-backend/internal/services"
 	"github.com/MediStatTech/MediStat-auth-backend/internal/transport"
 	"github.com/MediStatTech/MediStat-auth-backend/internal/transport/handler/router"
+	"github.com/MediStatTech/MediStat-auth-backend/pkg/db"
+	jwt "github.com/MediStatTech/MediStat-jwt"
 	"github.com/MediStatTech/MediStat-log/logger"
 )
 
@@ -23,10 +27,19 @@ func Run() {
 		panic(err)
 	}
 
-	serv := transport.NewServer(cfg)
-	services := services.NewServices()
+	db, err := db.NewPostgresDB(cfg.PostgresDSN)
+	if err != nil {
+		panic(err)
+	}
 
-	router.RegisterRoutes(serv, services)
+	jwt := jwt.New(cfg.JWTSecret, 72*time.Hour)
+
+	rep := repository.New(db)
+
+	serv := transport.NewServer(cfg)
+	services := services.NewServices(rep, jwt)
+
+	router.RegisterRoutes(serv, services, jwt)
 
 	log.Info("MediStat Auth Backend is running", map[string]any{
 		"port": cfg.HTTPPort,
